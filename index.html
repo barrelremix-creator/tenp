@@ -37,42 +37,31 @@
             align-items: center;
             border-radius: 50%;
             cursor: pointer;
-            transition: transform 0.2s, background-color 0.2s, font-family 0.2s;
+            transition: transform 0.2s, background-color 0.2s;
             box-sizing: border-box;
             padding: 5px;
             line-height: 1.1;
             text-align: center;
         }
         .vertex.hidden { opacity: 0; pointer-events: none; }
+        /* 積(multiply) */
         .vertex.selected-multiply { background-color: #d9534f; border: 4px solid #d43f3a; }
+        /* 商(divide) */
         .vertex.selected-divide { background-color: #28a745; border: 4px solid #1e7e34; }
+        /* 差(subtract) */
         .vertex.selected-subtract { background-color: #007bff; border: 4px solid #0056b3; }
+        /* 和(sum) */
         .vertex.in-drag-chain { background-color: #5cb85c; border: 4px solid #4cae4c; transform: scale(1.1); }
         
-        .control-container {
+        #button-container {
             position: absolute;
             top: -55px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            pointer-events: none;
-        }
-        
-        #font-selector {
-            font-size: 16px;
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            margin-left: 10px;
-            pointer-events: auto;
-        }
-
-        #button-container {
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             gap: 10px;
-            margin-right: 10px;
-            pointer-events: auto;
+            width: 100%;
+            justify-content: center;
         }
         #reset-button, #next-puzzle-button {
             padding: 10px 20px;
@@ -95,18 +84,9 @@
 <body>
 
 <div id="game-container">
-    <div class="control-container">
-        <select id="font-selector">
-            <option value="Futura, sans-serif">Futura</option>
-            <option value="'Century Gothic', sans-serif">Century Gothic</option>
-            <option value="Sabon, serif">Sabon</option>
-            <option value="'Times New Roman', Times, serif">Times New Roman</option>
-        </select>
-        
-        <div id="button-container">
-            <button id="reset-button">リセット</button>
-            <button id="next-puzzle-button">次の問題</button>
-        </div>
+    <div id="button-container">
+        <button id="reset-button">リセット</button>
+        <button id="next-puzzle-button">次の問題</button>
     </div>
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
@@ -166,7 +146,6 @@
     const resetButton = document.getElementById('reset-button');
     const nextPuzzleButton = document.getElementById('next-puzzle-button');
     const messageArea = document.getElementById('message-area');
-    const fontSelector = document.getElementById('font-selector');
 
     // --- 初期化・更新関数 ---
     function applyLayout() {
@@ -184,10 +163,6 @@
         vertices[1].style.top = marginPx; vertices[1].style.left = rightPos;
         vertices[2].style.top = bottomPos; vertices[2].style.left = marginPx;
         vertices[3].style.top = bottomPos; vertices[3].style.left = rightPos;
-    }
-    function applyFont() {
-        const selectedFont = fontSelector.value;
-        vertices.forEach(v => { v.style.fontFamily = selectedFont; });
     }
     function setupNewProblem() {
         if (solvablePuzzles.length === 0) { alert("エラー: 問題リストが空です。"); return; }
@@ -269,38 +244,58 @@
         }
     }
 
-    // --- イベント処理 ---
+    // --- ★ イベント処理 (新ロジック) ---
+
+    // タップ操作のハンドリング
     function handleTap(index) {
         if (currentNumbers[index] === null) return;
+
+        // 何も選択されていない場合 → 積の待機状態へ
         if (operationState.sourceIndex === null) {
             selectForOperation('multiply', index);
             return;
         }
+
+        // 何か選択されている場合
         if (operationState.sourceIndex === index) {
-            if (operationState.type === 'multiply') selectForOperation('divide', index);
-            else if (operationState.type === 'divide') selectForOperation('subtract', index);
-            else cancelOperation();
+            // 同じ要素を再度タップした場合: 操作を切り替える
+            if (operationState.type === 'multiply') {
+                selectForOperation('divide', index); // 積 → 商
+            } else if (operationState.type === 'divide') {
+                selectForOperation('subtract', index); // 商 → 差
+            } else {
+                cancelOperation(); // 差 → キャンセル
+            }
         } else {
+            // 別の要素をタップした場合: 計算を実行
             executeTwoStepOperation(index);
         }
     }
     
+    // イベントリスナー
     vertices.forEach((vertex, index) => {
-        vertex.addEventListener('pointerdown', (e) => {
+        // --- PC向けのマウスイベント ---
+        vertex.addEventListener('mousedown', (e) => {
             if (currentNumbers[index] === null) return;
-            e.target.setPointerCapture(e.pointerId);
             isDragging = true;
             dragChain = [index];
             touchStartInfo = { x: e.clientX, y: e.clientY };
         });
+
+        // --- スマートフォン向けのタッチイベント ---
+        vertex.addEventListener('touchstart', (e) => {
+            if (currentNumbers[index] === null) return;
+            e.preventDefault();
+            isDragging = true;
+            dragChain = [index];
+            touchStartInfo = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }, { passive: false });
     });
 
+    // --- ドラッグ処理 (PC & スマホ共通) ---
     function handleMove(e) {
         if (!isDragging) return;
-        // ★★★★★ 画面スクロールを防止する命令 ★★★★★
-        e.preventDefault(); 
-        
-        const pos = e.pointerType === 'touch' ? e : e;
+        const pos = e.touches ? e.touches[0] : e;
         const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
         if (targetElement && targetElement.classList.contains('vertex')) {
             const index = parseInt(targetElement.dataset.index, 10);
@@ -310,20 +305,27 @@
             }
         }
     }
-    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('touchmove', handleMove, { passive: false });
 
+    // --- 操作終了処理 (PC & スマホ共通) ---
     function handleEnd(e) {
         if (!isDragging) return;
-        const dx = Math.abs(e.clientX - touchStartInfo.x);
-        const dy = Math.abs(e.clientY - touchStartInfo.y);
-        
+
+        const pos = e.changedTouches ? e.changedTouches[0] : e;
+        const dx = Math.abs(pos.clientX - touchStartInfo.x);
+        const dy = Math.abs(pos.clientY - touchStartInfo.y);
+
+        // 指の移動が少なければ「タップ」、多ければ「ドラッグ」と判断
         if (dx < 10 && dy < 10) {
-            const targetElement = e.target;
+            // タップ操作
+            const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
             if(targetElement && targetElement.classList.contains('vertex')) {
                 const index = parseInt(targetElement.dataset.index, 10);
                 handleTap(index);
             }
         } else {
+            // ドラッグ操作 (和)
             if (dragChain.length > 1) {
                 const sum = dragChain.reduce((acc, idx) => performOperation('+', acc, currentNumbers[idx]), 0);
                 const targetIndex = dragChain[dragChain.length - 1];
@@ -334,19 +336,21 @@
                 checkWinCondition();
             }
         }
+        
         isDragging = false;
         dragChain = [];
+        // ドラッグでなかった場合、選択状態はhandleTap内で更新されるのでここでは何もしない
         if (dx >= 10 || dy >= 10) {
             updateDisplay();
         }
     }
-    document.addEventListener('pointerup', handleEnd);
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchend', handleEnd);
 
-    // グローバルリスナー
+    // --- グローバルリスナー ---
     gameContainer.addEventListener('click', e => { if (e.target === e.currentTarget) cancelOperation(); });
     resetButton.addEventListener('click', resetProblem);
     nextPuzzleButton.addEventListener('click', goToNextProblem);
-    fontSelector.addEventListener('change', applyFont);
     gameContainer.addEventListener('contextmenu', e => e.preventDefault());
 
     // --- ゲーム開始処理 ---
@@ -364,7 +368,6 @@
             solvablePuzzles = [[1, 2, 3, 4], [1, 1, 9, 9], [3, 3, 8, 8]];
         }
         applyLayout();
-        applyFont();
         setupNewProblem();
     }
     initializeGame();
