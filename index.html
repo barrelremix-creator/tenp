@@ -49,7 +49,6 @@
         .vertex.selected-subtract { background-color: #007bff; border: 4px solid #0056b3; }
         .vertex.in-drag-chain { background-color: #5cb85c; border: 4px solid #4cae4c; transform: scale(1.1); }
         
-        /* UIコントロール要素のコンテナ */
         .control-container {
             position: absolute;
             top: -55px;
@@ -57,24 +56,23 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            pointer-events: none; /* コンテナ自体はクリックを妨げない */
+            pointer-events: none;
         }
         
-        /* ★フォントセレクターのスタイル */
         #font-selector {
             font-size: 16px;
             padding: 8px;
             border-radius: 5px;
             border: 1px solid #ccc;
             margin-left: 10px;
-            pointer-events: auto; /* セレクターはクリック可能に */
+            pointer-events: auto;
         }
 
         #button-container {
             display: flex;
             gap: 10px;
             margin-right: 10px;
-            pointer-events: auto; /* ボタンはクリック可能に */
+            pointer-events: auto;
         }
         #reset-button, #next-puzzle-button {
             padding: 10px 20px;
@@ -168,7 +166,7 @@
     const resetButton = document.getElementById('reset-button');
     const nextPuzzleButton = document.getElementById('next-puzzle-button');
     const messageArea = document.getElementById('message-area');
-    const fontSelector = document.getElementById('font-selector'); // ★追加
+    const fontSelector = document.getElementById('font-selector');
 
     // --- 初期化・更新関数 ---
     function applyLayout() {
@@ -187,12 +185,9 @@
         vertices[2].style.top = bottomPos; vertices[2].style.left = marginPx;
         vertices[3].style.top = bottomPos; vertices[3].style.left = rightPos;
     }
-    // ★ フォントを適用する関数
     function applyFont() {
         const selectedFont = fontSelector.value;
-        vertices.forEach(v => {
-            v.style.fontFamily = selectedFont;
-        });
+        vertices.forEach(v => { v.style.fontFamily = selectedFont; });
     }
     function setupNewProblem() {
         if (solvablePuzzles.length === 0) { alert("エラー: 問題リストが空です。"); return; }
@@ -300,9 +295,13 @@
         });
     });
 
-    document.addEventListener('pointermove', (e) => {
+    function handleMove(e) {
         if (!isDragging) return;
-        const targetElement = document.elementFromPoint(e.clientX, e.clientY);
+        // ★★★★★ 画面スクロールを防止する命令 ★★★★★
+        e.preventDefault(); 
+        
+        const pos = e.pointerType === 'touch' ? e : e;
+        const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
         if (targetElement && targetElement.classList.contains('vertex')) {
             const index = parseInt(targetElement.dataset.index, 10);
             if (currentNumbers[index] !== null && !dragChain.includes(index)) {
@@ -310,12 +309,14 @@
                 updateDisplay();
             }
         }
-    });
+    }
+    document.addEventListener('pointermove', handleMove);
 
-    document.addEventListener('pointerup', (e) => {
+    function handleEnd(e) {
         if (!isDragging) return;
         const dx = Math.abs(e.clientX - touchStartInfo.x);
         const dy = Math.abs(e.clientY - touchStartInfo.y);
+        
         if (dx < 10 && dy < 10) {
             const targetElement = e.target;
             if(targetElement && targetElement.classList.contains('vertex')) {
@@ -338,13 +339,14 @@
         if (dx >= 10 || dy >= 10) {
             updateDisplay();
         }
-    });
+    }
+    document.addEventListener('pointerup', handleEnd);
 
     // グローバルリスナー
     gameContainer.addEventListener('click', e => { if (e.target === e.currentTarget) cancelOperation(); });
     resetButton.addEventListener('click', resetProblem);
     nextPuzzleButton.addEventListener('click', goToNextProblem);
-    fontSelector.addEventListener('change', applyFont); // ★追加
+    fontSelector.addEventListener('change', applyFont);
     gameContainer.addEventListener('contextmenu', e => e.preventDefault());
 
     // --- ゲーム開始処理 ---
@@ -362,7 +364,7 @@
             solvablePuzzles = [[1, 2, 3, 4], [1, 1, 9, 9], [3, 3, 8, 8]];
         }
         applyLayout();
-        applyFont(); // ★初期フォントを適用
+        applyFont();
         setupNewProblem();
     }
     initializeGame();
