@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>テンパズル</title>
     <style>
-        /* ページ全体のスタイル */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Arial", "Meiryo", sans-serif;
             display: flex;
@@ -14,12 +13,10 @@
             height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
-            -webkit-user-select: none; /* テキスト選択を無効化 */
+            -webkit-user-select: none;
             user-select: none;
-            touch-action: manipulation; /* ダブルタップ時のズームを無効化 */
+            touch-action: manipulation;
         }
-        
-        /* ゲームコンテナ */
         #game-container {
             position: relative;
             width: 90%;
@@ -30,8 +27,6 @@
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
-
-        /* 頂点の共通スタイル */
         .vertex {
             position: absolute;
             background-color: #4a90e2;
@@ -48,14 +43,16 @@
             line-height: 1.1;
             text-align: center;
         }
-        
         .vertex.hidden { opacity: 0; pointer-events: none; }
-        .vertex.selected { background-color: #d9534f; border: 4px solid #d43f3a; }
-        .vertex.selected-subtract { background-color: #007bff; border: 4px solid #0056b3; }
+        /* 積(multiply) */
+        .vertex.selected-multiply { background-color: #d9534f; border: 4px solid #d43f3a; }
+        /* 商(divide) */
         .vertex.selected-divide { background-color: #28a745; border: 4px solid #1e7e34; }
+        /* 差(subtract) */
+        .vertex.selected-subtract { background-color: #007bff; border: 4px solid #0056b3; }
+        /* 和(sum) */
         .vertex.in-drag-chain { background-color: #5cb85c; border: 4px solid #4cae4c; transform: scale(1.1); }
         
-        /* ボタンコンテナ */
         #button-container {
             position: absolute;
             top: -55px;
@@ -77,8 +74,6 @@
         }
         #reset-button { background-color: #f0ad4e; }
         #next-puzzle-button { background-color: #337ab7; }
-        
-        /* メッセージエリア */
         #message-area {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%); font-size: 48px;
@@ -103,9 +98,7 @@
 <script>
     // --- レイアウト設定 ---
     const LAYOUT_CONFIG = {
-        VERTEX_SIZE_VW: 20,   // 頂点のサイズ (ビューポート幅に対する%)
-        VERTEX_MARGIN_VW: 5,  // 外枠からの間隔 (ビューポート幅に対する%)
-        FONT_SIZE_RATIO: 0.4, // 頂点サイズに対するフォントサイズの割合
+        VERTEX_SIZE_VW: 20, FONT_SIZE_RATIO: 0.4, VERTEX_MARGIN_VW: 5
     };
 
     // --- 分数クラス ---
@@ -143,8 +136,9 @@
     let currentPuzzleIndex = 0;
     let initialNumbers = [], currentNumbers = [];
     let operationState = { type: null, sourceIndex: null };
-    let isSumDragging = false, dragChain = [];
-    let interactionState = { startX: 0, startY: 0, startTime: 0, pressTimer: null };
+    let isDragging = false;
+    let dragChain = [];
+    let touchStartInfo = { x: 0, y: 0 };
 
     // --- DOM要素 ---
     const gameContainer = document.getElementById('game-container');
@@ -162,7 +156,6 @@
         const sizePx = `${size}px`, marginPx = `${margin}px`;
         const rightPos = `calc(100% - ${size + margin}px)`;
         const bottomPos = `calc(100% - ${size + margin}px)`;
-
         vertices.forEach(v => {
             v.style.width = sizePx; v.style.height = sizePx; v.style.fontSize = `${fontSize}px`;
         });
@@ -171,22 +164,17 @@
         vertices[2].style.top = bottomPos; vertices[2].style.left = marginPx;
         vertices[3].style.top = bottomPos; vertices[3].style.left = rightPos;
     }
-
     function setupNewProblem() {
-        if (solvablePuzzles.length === 0) {
-            alert("エラー: 問題リストが空です。"); return;
-        }
+        if (solvablePuzzles.length === 0) { alert("エラー: 問題リストが空です。"); return; }
         currentPuzzleIndex = Math.floor(Math.random() * solvablePuzzles.length);
         initialNumbers = [...solvablePuzzles[currentPuzzleIndex]];
         resetProblem();
     }
-
     function resetProblem() {
         currentNumbers = [...initialNumbers];
         cancelOperation();
         updateDisplay();
     }
-
     function updateDisplay() {
         vertices.forEach((v, i) => {
             const val = currentNumbers[i];
@@ -196,14 +184,12 @@
             } else {
                 v.textContent = ''; v.classList.add('hidden');
             }
-            v.classList.remove('selected', 'selected-subtract', 'selected-divide', 'in-drag-chain');
+            v.classList.remove('selected-multiply', 'selected-divide', 'selected-subtract', 'in-drag-chain');
         });
         if (operationState.sourceIndex !== null) {
             const opVertex = vertices[operationState.sourceIndex];
-            switch (operationState.type) {
-                case 'multiply': opVertex.classList.add('selected'); break;
-                case 'subtract': opVertex.classList.add('selected-subtract'); break;
-                case 'divide': opVertex.classList.add('selected-divide'); break;
+            if (operationState.type) {
+                opVertex.classList.add(`selected-${operationState.type}`);
             }
         }
         if (dragChain.length > 0) {
@@ -221,7 +207,6 @@
         operationState.sourceIndex = index;
         updateDisplay();
     }
-    
     function executeTwoStepOperation(targetIndex) {
         if (operationState.sourceIndex === null || operationState.sourceIndex === targetIndex) {
             cancelOperation(); return;
@@ -234,23 +219,18 @@
             default: cancelOperation(); return;
         }
         const result = performOperation(opSymbol, currentNumbers[operationState.sourceIndex], currentNumbers[targetIndex]);
-        if (result === null) {
-            alert("0で割ることはできません。"); cancelOperation(); return;
-        }
+        if (result === null) { alert("0で割ることはできません。"); cancelOperation(); return; }
         currentNumbers[targetIndex] = result;
         currentNumbers[operationState.sourceIndex] = null;
         cancelOperation();
         checkWinCondition();
     }
-
     function cancelOperation() {
         operationState = { type: null, sourceIndex: null };
-        if (isSumDragging) { isSumDragging = false; dragChain = []; }
+        if (isDragging) { isDragging = false; dragChain = []; }
         updateDisplay();
     }
-
     function goToNextProblem() { setupNewProblem(); }
-    
     function checkWinCondition() {
         updateDisplay();
         const nonNullNumbers = currentNumbers.filter(n => n !== null);
@@ -264,35 +244,58 @@
         }
     }
 
-    // --- iPhone向けタッチイベントリスナー ---
-    function handleTouchStart(e, index) {
+    // --- ★ イベント処理 (新ロジック) ---
+
+    // タップ操作のハンドリング
+    function handleTap(index) {
         if (currentNumbers[index] === null) return;
-        e.preventDefault();
 
-        const pos = e.touches[0];
-        interactionState = {
-            startX: pos.clientX, startY: pos.clientY,
-            startTime: Date.now(), pressTimer: null
-        };
-        
-        // 長押しで減算を選択
-        interactionState.pressTimer = setTimeout(() => {
-            selectForOperation('subtract', index);
-            interactionState.pressTimer = null; // 発火済み
-        }, 500);
+        // 何も選択されていない場合 → 積の待機状態へ
+        if (operationState.sourceIndex === null) {
+            selectForOperation('multiply', index);
+            return;
+        }
 
-        // ドラッグ(和)の開始
-        isSumDragging = true;
-        dragChain = [index];
-        updateDisplay();
+        // 何か選択されている場合
+        if (operationState.sourceIndex === index) {
+            // 同じ要素を再度タップした場合: 操作を切り替える
+            if (operationState.type === 'multiply') {
+                selectForOperation('divide', index); // 積 → 商
+            } else if (operationState.type === 'divide') {
+                selectForOperation('subtract', index); // 商 → 差
+            } else {
+                cancelOperation(); // 差 → キャンセル
+            }
+        } else {
+            // 別の要素をタップした場合: 計算を実行
+            executeTwoStepOperation(index);
+        }
     }
+    
+    // イベントリスナー
+    vertices.forEach((vertex, index) => {
+        // --- PC向けのマウスイベント ---
+        vertex.addEventListener('mousedown', (e) => {
+            if (currentNumbers[index] === null) return;
+            isDragging = true;
+            dragChain = [index];
+            touchStartInfo = { x: e.clientX, y: e.clientY };
+        });
 
-    function handleTouchMove(e) {
-        if (!isSumDragging) return;
-        // 指が動いたら長押しはキャンセル
-        if (interactionState.pressTimer) clearTimeout(interactionState.pressTimer);
+        // --- スマートフォン向けのタッチイベント ---
+        vertex.addEventListener('touchstart', (e) => {
+            if (currentNumbers[index] === null) return;
+            e.preventDefault();
+            isDragging = true;
+            dragChain = [index];
+            touchStartInfo = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }, { passive: false });
+    });
 
-        const pos = e.touches[0];
+    // --- ドラッグ処理 (PC & スマホ共通) ---
+    function handleMove(e) {
+        if (!isDragging) return;
+        const pos = e.touches ? e.touches[0] : e;
         const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
         if (targetElement && targetElement.classList.contains('vertex')) {
             const index = parseInt(targetElement.dataset.index, 10);
@@ -302,79 +305,72 @@
             }
         }
     }
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('touchmove', handleMove, { passive: false });
 
-    function handleTouchEnd(e, index) {
-        if (interactionState.pressTimer) clearTimeout(interactionState.pressTimer);
+    // --- 操作終了処理 (PC & スマホ共通) ---
+    function handleEnd(e) {
+        if (!isDragging) return;
 
-        const touchEndTime = Date.now();
-        const pos = e.changedTouches[0];
-        const dx = Math.abs(pos.clientX - interactionState.startX);
-        const dy = Math.abs(pos.clientY - interactionState.startY);
+        const pos = e.changedTouches ? e.changedTouches[0] : e;
+        const dx = Math.abs(pos.clientX - touchStartInfo.x);
+        const dy = Math.abs(pos.clientY - touchStartInfo.y);
 
-        // ドラッグ(和)の終了
-        if (dragChain.length > 1) {
-            let sum = dragChain.reduce((acc, idx) => performOperation('+', acc, currentNumbers[idx]), 0);
-            currentNumbers[dragChain[dragChain.length - 1]] = sum;
-            dragChain.slice(0, -1).forEach(idx => { currentNumbers[idx] = null; });
-            checkWinCondition();
-        } 
-        // 短いタップ(積)の処理
-        else if (touchEndTime - interactionState.startTime < 250 && dx < 10 && dy < 10) {
-            if (operationState.sourceIndex !== null && operationState.sourceIndex !== index) {
-                executeTwoStepOperation(index);
-            } else {
-                selectForOperation('multiply', index);
+        // 指の移動が少なければ「タップ」、多ければ「ドラッグ」と判断
+        if (dx < 10 && dy < 10) {
+            // タップ操作
+            const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
+            if(targetElement && targetElement.classList.contains('vertex')) {
+                const index = parseInt(targetElement.dataset.index, 10);
+                handleTap(index);
+            }
+        } else {
+            // ドラッグ操作 (和)
+            if (dragChain.length > 1) {
+                const sum = dragChain.reduce((acc, idx) => performOperation('+', acc, currentNumbers[idx]), 0);
+                const targetIndex = dragChain[dragChain.length - 1];
+                currentNumbers[targetIndex] = sum;
+                dragChain.forEach(idx => {
+                    if (idx !== targetIndex) currentNumbers[idx] = null;
+                });
+                checkWinCondition();
             }
         }
         
-        isSumDragging = false;
+        isDragging = false;
         dragChain = [];
-        if(operationState.type !== 'subtract' && operationState.type !== 'multiply') {
-             updateDisplay();
+        // ドラッグでなかった場合、選択状態はhandleTap内で更新されるのでここでは何もしない
+        if (dx >= 10 || dy >= 10) {
+            updateDisplay();
         }
     }
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchend', handleEnd);
 
-    vertices.forEach((vertex, index) => {
-        vertex.addEventListener('touchstart', (e) => handleTouchStart(e, index), { passive: false });
-        vertex.addEventListener('touchend', (e) => handleTouchEnd(e, index));
-        vertex.addEventListener('dblclick', (e) => { // ダブルタップで除算
-            e.preventDefault();
-            if (currentNumbers[index] !== null) selectForOperation('divide', index);
-        });
-    });
-
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    
     // --- グローバルリスナー ---
-    gameContainer.addEventListener('click', e => { if (e.target === gameContainer) cancelOperation(); });
+    gameContainer.addEventListener('click', e => { if (e.target === e.currentTarget) cancelOperation(); });
     resetButton.addEventListener('click', resetProblem);
     nextPuzzleButton.addEventListener('click', goToNextProblem);
     gameContainer.addEventListener('contextmenu', e => e.preventDefault());
 
-    // --- ★ ゲーム開始処理 (CSV読み込み) ---
+    // --- ゲーム開始処理 ---
     async function initializeGame() {
         try {
-            // tenp.csvファイルを読み込む
             const response = await fetch('tenp.csv');
             if (!response.ok) throw new Error('CSVファイルの読み込みに失敗しました。');
-            
             const csvText = await response.text();
             const puzzleStrings = csvText.trim().replace(/\s/g, '').split(',').filter(s => s.length === 4);
             solvablePuzzles = puzzleStrings.map(str => str.split('').map(digit => parseInt(digit, 10)));
             if (solvablePuzzles.length === 0) throw new Error("有効な問題が見つかりません。");
-
         } catch (error) {
             console.error(error);
             alert('問題ファイルの読み込みに失敗したため、デフォルトの問題で開始します。');
             solvablePuzzles = [[1, 2, 3, 4], [1, 1, 9, 9], [3, 3, 8, 8]];
         }
-
         applyLayout();
         setupNewProblem();
     }
-
     initializeGame();
-
 </script>
 
 </body>
