@@ -90,6 +90,15 @@
             transform: translate(-50%, -50%); font-size: 48px;
             color: #4CAF50; font-weight: bold; display: none; text-align: center;
         }
+
+        /* ★ バージョン表示用のスタイルを追加 */
+        #version-display {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 14px;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
@@ -108,6 +117,9 @@
             <button id="next-puzzle-button">次の問題</button>
         </div>
     </div>
+    
+    <div id="version-display">Ver. 1.0</div>
+
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
     <div id="v2" class="vertex" data-index="2"></div>
@@ -297,8 +309,7 @@
 
     function handleMove(e) {
         if (!isDragging) return;
-        // ★★★★★ 画面スクロールを防止する命令 ★★★★★
-        e.preventDefault(); 
+        e.preventDefault();
         
         const pos = e.pointerType === 'touch' ? e : e;
         const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
