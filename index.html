@@ -49,34 +49,26 @@
         .vertex.selected-subtract { background-color: #007bff; border: 4px solid #0056b3; }
         .vertex.in-drag-chain { background-color: #5cb85c; border: 4px solid #4cae4c; transform: scale(1.1); }
         
-        .control-container {
-            position: absolute;
-            top: -55px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            pointer-events: none;
-        }
-        
+        /* --- ★ UIレイアウトを修正 --- */
         #font-selector {
-            font-size: 16px;
-            padding: 8px;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 14px;
+            padding: 5px;
             border-radius: 5px;
             border: 1px solid #ccc;
-            margin-left: 10px;
-            pointer-events: auto;
         }
-
         #button-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
             display: flex;
-            gap: 10px;
-            margin-right: 10px;
-            pointer-events: auto;
+            gap: 8px;
         }
         #reset-button, #next-puzzle-button {
-            padding: 10px 20px;
-            font-size: 16px;
+            padding: 8px 12px;
+            font-size: 14px;
             cursor: pointer;
             color: white;
             border: none;
@@ -90,10 +82,9 @@
             transform: translate(-50%, -50%); font-size: 48px;
             color: #4CAF50; font-weight: bold; display: none; text-align: center;
         }
-
         #version-display {
             position: absolute;
-            top: 10px;
+            bottom: 10px;
             right: 15px;
             font-size: 14px;
             color: #aaa;
@@ -103,21 +94,19 @@
 <body>
 
 <div id="game-container">
-    <div class="control-container">
-        <select id="font-selector">
-            <option value="Futura, sans-serif">Futura</option>
-            <option value="'Century Gothic', sans-serif">Century Gothic</option>
-            <option value="Sabon, serif">Sabon</option>
-            <option value="'Times New Roman', Times, serif">Times New Roman</option>
-        </select>
-        
-        <div id="button-container">
-            <button id="reset-button">リセット</button>
-            <button id="next-puzzle-button">次の問題</button>
-        </div>
+    <select id="font-selector">
+        <option value="Futura, sans-serif">Futura</option>
+        <option value="'Century Gothic', sans-serif">Century Gothic</option>
+        <option value="Sabon, serif">Sabon</option>
+        <option value="'Times New Roman', Times, serif">Times New Roman</option>
+    </select>
+    
+    <div id="button-container">
+        <button id="reset-button">リセット</button>
+        <button id="next-puzzle-button">次の問題</button>
     </div>
     
-    <div id="version-display">Ver. 1.2</div>
+    <div id="version-display">Ver. 1.3</div>
 
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
@@ -299,6 +288,8 @@
     vertices.forEach((vertex, index) => {
         vertex.addEventListener('pointerdown', (e) => {
             if (currentNumbers[index] === null) return;
+            // UI要素上での操作は無視する
+            if (e.target.closest('#font-selector, #button-container')) return;
             e.target.setPointerCapture(e.pointerId);
             isDragging = true;
             dragChain = [index];
@@ -308,10 +299,9 @@
 
     function handleMove(e) {
         if (!isDragging) return;
-        // ★★★★★ 画面スクロールを防止する命令 ★★★★★
         e.preventDefault();
         
-        const pos = e; // ポインターイベントはタッチとマウスを統合
+        const pos = e;
         const targetElement = document.elementFromPoint(pos.clientX, pos.clientY);
         if (targetElement && targetElement.classList.contains('vertex')) {
             const index = parseInt(targetElement.dataset.index, 10);
