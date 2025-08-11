@@ -12,7 +12,7 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
+            background-color: #2b2b2b;
             -webkit-user-select: none;
             user-select: none;
         }
@@ -20,8 +20,8 @@
             position: relative;
             width: 95%;
             max-width: 450px;
-            aspect-ratio: 2 / 3;
-            background-color: #fff;
+            aspect-ratio: 1 / 1;
+            background-color: #1f1f1f;
             border: 2px solid #333;
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
@@ -29,9 +29,11 @@
         }
         .vertex {
             position: absolute;
-            background-color: #4a90e2;
+            background-color: #2e2e2e;
             color: white;
             font-weight: bold;
+
+	    border: 2px solid #DBDBDB;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -108,7 +110,7 @@
         <button id="next-puzzle-button">次の問題</button>
     </div>
     
-    <div id="version-display">Ver. 1.5</div>
+    <div id="version-display">Ver. 1.0</div>
 
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
