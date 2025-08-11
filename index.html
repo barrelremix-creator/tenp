@@ -32,31 +32,24 @@
             background-color: #2e2e2e;
             color: white;
             font-weight: bold;
-
-	    border: 2px solid #DBDBDB;
+            border: 2px solid #DBDBDB;
             display: flex;
             justify-content: center;
             align-items: center;
             border-radius: 50%;
             cursor: pointer;
-            transition: transform 0.2s, background-color 0.2s, font-family 0.2s;
+            transition: transform 0.2s, background-color 0.2s, font-family 0.2s, color 0.2s, border-color 0.2s;
             box-sizing: border-box;
             padding: 5px;
             line-height: 1.1;
             text-align: center;
         }
         .vertex.hidden { opacity: 0; pointer-events: none; }
-        .vertex.selected-multiply { color: #C20000; border: 2px solid #C20000; transform: scale(1.1);}
-        .vertex.selected-divide { color: #32B338; border: 2px solid #32B338; transform: scale(1.1);}
-        .vertex.selected-subtract { color: #3259E0; border: 2px solid #3259E0; transform: scale(1.1);}
-        .vertex.in-drag-chain { color: #E05929; border: 2px solid #E05929;transform: scale(1.1); }
+        .vertex.selected-multiply { color: #C20000; border-color: #C20000; transform: scale(1.1);}
+        .vertex.selected-divide { color: #32B338; border-color: #32B338; transform: scale(1.1);}
+        .vertex.selected-subtract { color: #3259E0; border-color: #3259E0; transform: scale(1.1);}
+        .vertex.in-drag-chain { color: #E05929; border-color: #E05929;transform: scale(1.1); }
         
-	//.vertex.selected-multiply { background-color: #E62F2F; border: 4px solid #C20000; }
-        //.vertex.selected-divide { background-color: #28a745; border: 4px solid #1e7e34; }
-        //.vertex.selected-subtract { background-color: #007bff; border: 4px solid #0056b3; }
-        //.vertex.in-drag-chain { background-color: #5cb85c; border: 4px solid #4cae4c; transform: scale(1.1); }
-
-        /* UIコントロールの配置 */
         #font-selector {
             position: absolute;
             top: 10px;
@@ -79,17 +72,13 @@
             padding: 8px 12px;
             font-size: 14px;
             cursor: pointer;
-	    background-color: #202020;
+            background-color: #202020;
             color: white;
-     
             border-radius: 5px;
             flex-shrink: 0;
         }
         #reset-button { border: 3px solid #f0ad4e; }
         #next-puzzle-button { border: 3px solid #337ab7; }
-
-
-
         #message-area {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%); font-size: 48px;
@@ -119,7 +108,7 @@
         <button id="next-puzzle-button">Next</button>
     </div>
     
-    <div id="version-display">Ver. 1.1.9</div>
+    <div id="version-display">Ver. 1.2.1</div>
 
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
@@ -131,11 +120,8 @@
 <script>
     // --- レイアウト設定 ---
     const LAYOUT_CONFIG = {
-    VERTEX_SIZE_VW: 28,      // 丸自体の大きさ（画面幅の%）
-    FONT_SIZE_RATIO: 0.4,      // 丸の中の文字の大きさ
-    SQUARE_SIZE_VW: 40,      //  配置用正方形の一辺の長さ（画面幅の%）
-    SQUARE_CENTER_Y_VW: 70,  //  正方形の中心のY座標（上から%の位置）
-    SQUARE_CENTER_X_VW: 50,  //  正方形の中心のX座標（左から%の位置）
+        VERTEX_SIZE_VW: 28, FONT_SIZE_RATIO: 0.4,
+        SQUARE_SIZE_VW: 40, SQUARE_CENTER_Y_VW: 70, SQUARE_CENTER_X_VW: 50,
     };
 
     // --- 分数クラス ---
@@ -170,7 +156,6 @@
 
     // --- ゲームデータと状態変数 ---
     let solvablePuzzles = [];
-    let currentPuzzleIndex = 0;
     let initialNumbers = [], currentNumbers = [];
     let operationState = { type: null, sourceIndex: null };
     let isDragging = false;
@@ -187,47 +172,31 @@
 
     // --- 初期化・更新関数 ---
     function applyLayout() {
-    const containerSize = gameContainer.offsetWidth; // ゲーム盤の現在のピクセル幅
-    
-    // --- 丸自体のサイズ設定 ---
-    const vertexSize = containerSize * (LAYOUT_CONFIG.VERTEX_SIZE_VW / 100);
-    const fontSize = vertexSize * LAYOUT_CONFIG.FONT_SIZE_RATIO;
-    vertices.forEach(v => {
-        v.style.width = `${vertexSize}px`;
-        v.style.height = `${vertexSize}px`;
-        v.style.fontSize = `${fontSize}px`;
-    });
-
-    // --- 丸の位置計算 ---
-    // 1. 配置用正方形の中心座標を計算
-    const centerX = containerSize * (LAYOUT_CONFIG.SQUARE_CENTER_X_VW / 100);
-    const centerY = containerSize * (LAYOUT_CONFIG.SQUARE_CENTER_Y_VW / 100);
-
-    // 2. 正方形の一辺の長さの半分を計算
-    const halfSquareSize = containerSize * (LAYOUT_CONFIG.SQUARE_SIZE_VW / 100) / 2;
-
-    // 3. 正方形の四隅の座標を計算
-    const topLeft = { x: centerX - halfSquareSize, y: centerY - halfSquareSize };
-    const topRight = { x: centerX + halfSquareSize, y: centerY - halfSquareSize };
-    const bottomLeft = { x: centerX - halfSquareSize, y: centerY + halfSquareSize };
-    const bottomRight = { x: centerX + halfSquareSize, y: centerY + halfSquareSize };
-
-    // 4. 各丸を、中心が隅の座標に来るように配置
-    const halfVertexSize = vertexSize / 2;
-    vertices[0].style.left = `${topLeft.x - halfVertexSize}px`;
-    vertices[0].style.top = `${topLeft.y - halfVertexSize}px`;
-
-    vertices[1].style.left = `${topRight.x - halfVertexSize}px`;
-    vertices[1].style.top = `${topRight.y - halfVertexSize}px`;
-
-    vertices[2].style.left = `${bottomLeft.x - halfVertexSize}px`;
-    vertices[2].style.top = `${bottomLeft.y - halfVertexSize}px`;
-    
-    vertices[3].style.left = `${bottomRight.x - halfVertexSize}px`;
-    vertices[3].style.top = `${bottomRight.y - halfVertexSize}px`;
+        const containerSize = gameContainer.offsetWidth;
+        const vertexSize = containerSize * (LAYOUT_CONFIG.VERTEX_SIZE_VW / 100);
+        const fontSize = vertexSize * LAYOUT_CONFIG.FONT_SIZE_RATIO;
+        vertices.forEach(v => {
+            v.style.width = `${vertexSize}px`;
+            v.style.height = `${vertexSize}px`;
+            v.style.fontSize = `${fontSize}px`;
+        });
+        const centerX = containerSize * (LAYOUT_CONFIG.SQUARE_CENTER_X_VW / 100);
+        const centerY = containerSize * (LAYOUT_CONFIG.SQUARE_CENTER_Y_VW / 100);
+        const halfSquareSize = containerSize * (LAYOUT_CONFIG.SQUARE_SIZE_VW / 100) / 2;
+        const topLeft = { x: centerX - halfSquareSize, y: centerY - halfSquareSize };
+        const topRight = { x: centerX + halfSquareSize, y: centerY - halfSquareSize };
+        const bottomLeft = { x: centerX - halfSquareSize, y: centerY + halfSquareSize };
+        const bottomRight = { x: centerX + halfSquareSize, y: centerY + halfSquareSize };
+        const halfVertexSize = vertexSize / 2;
+        vertices[0].style.left = `${topLeft.x - halfVertexSize}px`;
+        vertices[0].style.top = `${topLeft.y - halfVertexSize}px`;
+        vertices[1].style.left = `${topRight.x - halfVertexSize}px`;
+        vertices[1].style.top = `${topRight.y - halfVertexSize}px`;
+        vertices[2].style.left = `${bottomLeft.x - halfVertexSize}px`;
+        vertices[2].style.top = `${bottomLeft.y - halfVertexSize}px`;
+        vertices[3].style.left = `${bottomRight.x - halfVertexSize}px`;
+        vertices[3].style.top = `${bottomRight.y - halfVertexSize}px`;
     }
-
-
     function applyFont() {
         const selectedFont = fontSelector.value;
         vertices.forEach(v => { v.style.fontFamily = selectedFont; });
@@ -300,45 +269,22 @@
     }
     function goToNextProblem() { setupNewProblem(); }
     function checkWinCondition() {
-    updateDisplay();
-    
-    // 条件①: 配列内に「10」が含まれているか
-    const hasTen = currentNumbers.includes(10);
-
-    // 条件②: すべての要素が「10, 1, 0, null」のいずれかであるか
-    const allOthersAreValid = currentNumbers.every(n => 
-        n === 10 || n === 1 || n === 0 || n === null
-    );
-
-    // 2つの条件が両方とも真であれば、正解とみなす
-    if (hasTen && allOthersAreValid) {
-        
-        // 正解だった場合の処理
-        messageArea.textContent = "Clear！";
-        messageArea.style.display = 'block';
-        setTimeout(() => {
-            messageArea.style.display = 'none';
-            goToNextProblem();
-        }, 2000);
-    }
-}
-
-    // --- イベント処理 ---
-    function handleTap(index) {
-        if (currentNumbers[index] === null) return;
-        if (operationState.sourceIndex === null) {
-            selectForOperation('multiply', index);
-            return;
-        }
-        if (operationState.sourceIndex === index) {
-            if (operationState.type === 'multiply') selectForOperation('divide', index);
-            else if (operationState.type === 'divide') selectForOperation('subtract', index);
-            else cancelOperation();
-        } else {
-            executeTwoStepOperation(index);
+        updateDisplay();
+        const hasTen = currentNumbers.includes(10);
+        const allOthersAreValid = currentNumbers.every(n => 
+            n === 10 || n === 1 || n === 0 || n === null
+        );
+        if (hasTen && allOthersAreValid) {
+            messageArea.textContent = "Clear！";
+            messageArea.style.display = 'block';
+            setTimeout(() => {
+                messageArea.style.display = 'none';
+                goToNextProblem();
+            }, 2000);
         }
     }
-    
+
+    // --- ★★★★★ イベント処理 (スワイプ方式) ★★★★★ ---
     vertices.forEach((vertex, index) => {
         vertex.addEventListener('pointerdown', (e) => {
             if (currentNumbers[index] === null) return;
@@ -365,34 +311,67 @@
     }
     document.addEventListener('pointermove', handleMove, { passive: false });
 
+  
     function handleEnd(e) {
         if (!isDragging) return;
-        const dx = Math.abs(e.clientX - touchStartInfo.x);
-        const dy = Math.abs(e.clientY - touchStartInfo.y);
         
-        if (dx < 10 && dy < 10) {
-            const targetElement = e.target;
-            if(targetElement && targetElement.classList.contains('vertex')) {
-                const index = parseInt(targetElement.dataset.index, 10);
-                handleTap(index);
-            }
-        } else {
-            if (dragChain.length > 1) {
-                const sum = dragChain.reduce((acc, idx) => performOperation('+', acc, currentNumbers[idx]), 0);
-                const targetIndex = dragChain[dragChain.length - 1];
-                currentNumbers[targetIndex] = sum;
-                dragChain.forEach(idx => {
-                    if (idx !== targetIndex) currentNumbers[idx] = null;
-                });
-                checkWinCondition();
+        const dx = e.clientX - touchStartInfo.x;
+        const dy = e.clientY - touchStartInfo.y;
+        
+        let index = -1;
+        const targetElement = e.target.closest('.vertex');
+        if (targetElement) {
+            index = parseInt(targetElement.dataset.index, 10);
+        }
+        if (index === -1) {
+             const startElement = document.elementFromPoint(touchStartInfo.x, touchStartInfo.y);
+             if (startElement && startElement.classList.contains('vertex')) {
+                 index = parseInt(startElement.dataset.index, 10);
+             }
+        }
+        if (index === -1) {
+             isDragging = false;
+             dragChain = [];
+             updateDisplay();
+             return;
+        }
+
+        //ジェスチャー判定 ---
+
+        // 1. 【最優先】複数要素が選択されている場合 → 必ず「和」を実行
+        if (dragChain.length > 1) {
+            const sum = dragChain.reduce((acc, idx) => performOperation('+', acc, currentNumbers[idx]), 0);
+            const targetIndex = dragChain[dragChain.length - 1];
+            currentNumbers[targetIndex] = sum;
+            dragChain.forEach(idx => {
+                if (idx !== targetIndex) currentNumbers[idx] = null;
+            });
+            checkWinCondition();
+        }
+        // 2. 【単一要素の場合】下スワイプ → 「差」を選択
+        else if (dy > 30 && Math.abs(dx) < dy / 2) {
+            selectForOperation('subtract', index);
+        }
+        // 3. 【単一要素で移動が少ない場合】タップ → 「積」または「商」
+        else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+            if (operationState.sourceIndex === null) {
+                selectForOperation('multiply', index);
+            } else {
+                if (operationState.sourceIndex === index) {
+                    selectForOperation('divide', index);
+                } else {
+                    executeTwoStepOperation(index);
+                }
             }
         }
+        // 4. 上記以外（単一要素での中途半端なドラッグなど）は何もしない
+        
         isDragging = false;
         dragChain = [];
-        if (dx >= 10 || dy >= 10) {
-            updateDisplay();
-        }
+        updateDisplay();
     }
+
+
     document.addEventListener('pointerup', handleEnd);
 
     // グローバルリスナー
