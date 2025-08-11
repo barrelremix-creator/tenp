@@ -133,9 +133,9 @@
 <div id="game-container">
     <div class="ui-top-left">
         <select id="font-selector">
-            <option value="Futura, sans-serif">Futura</option>
-            <option value="'Century Gothic', sans-serif">Century Gothic</option>
             <option value="Sabon, serif">Sabon</option>
+			<option value="'Century Gothic', sans-serif">Century Gothic</option>
+            <option value="Futura, sans-serif">Futura</option>
             <option value="'Times New Roman', Times, serif">Times New Roman</option>
         </select>
         <div id="puzzle-input-container">
@@ -151,7 +151,7 @@
         <button id="undo-button">Undo</button>
     </div>
     
-    <div id="version-display">Ver. 1.2.6</div>
+    <div id="version-display">Ver. 1.2.7</div>
 
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
@@ -306,9 +306,23 @@
             dragChain.forEach(index => vertices[index].classList.add('in-drag-chain'));
         }
     }
+
+     //  Undoで分数を正しく復元するための関数を追加 
+    function fractionReviver(key, value) {
+        // "n"と"d"というプロパティを持つオブジェクトを見つけたら
+        if (typeof value === 'object' && value !== null && 'n' in value && 'd' in value) {
+            // それをFractionクラスのインスタンスとして新しく作り直す
+            return new Fraction(value.n, value.d);
+        }
+        // それ以外は、通常通り復元する
+        return value;
+    }
+
     function undoMove() {
         if (historyStack.length > 0) {
-            currentNumbers = JSON.parse(historyStack.pop());
+            const lastStateJSON = historyStack.pop();
+            // ★★★★★ JSON.parseに第2引数を追加 ★★★★★
+            currentNumbers = JSON.parse(lastStateJSON, fractionReviver);
             cancelOperation();
             updateDisplay();
         }
