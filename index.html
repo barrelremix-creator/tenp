@@ -119,7 +119,7 @@
         <button id="next-puzzle-button">Next</button>
     </div>
     
-    <div id="version-display">Ver. 1.1.8</div>
+    <div id="version-display">Ver. 1.1.9</div>
 
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
@@ -300,17 +300,28 @@
     }
     function goToNextProblem() { setupNewProblem(); }
     function checkWinCondition() {
-        updateDisplay();
-        const nonNullNumbers = currentNumbers.filter(n => n !== null);
-        if (nonNullNumbers.length === 1 && nonNullNumbers[0] === 10) {
-            messageArea.textContent = "Clear！";
-            messageArea.style.display = 'block';
-            setTimeout(() => {
-                messageArea.style.display = 'none';
-                goToNextProblem();
-            }, 2000);
-        }
+    updateDisplay();
+    
+    // 条件①: 配列内に「10」が含まれているか
+    const hasTen = currentNumbers.includes(10);
+
+    // 条件②: すべての要素が「10, 1, 0, null」のいずれかであるか
+    const allOthersAreValid = currentNumbers.every(n => 
+        n === 10 || n === 1 || n === 0 || n === null
+    );
+
+    // 2つの条件が両方とも真であれば、正解とみなす
+    if (hasTen && allOthersAreValid) {
+        
+        // 正解だった場合の処理
+        messageArea.textContent = "Clear！";
+        messageArea.style.display = 'block';
+        setTimeout(() => {
+            messageArea.style.display = 'none';
+            goToNextProblem();
+        }, 2000);
     }
+}
 
     // --- イベント処理 ---
     function handleTap(index) {
