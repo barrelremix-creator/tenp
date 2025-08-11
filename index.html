@@ -50,16 +50,47 @@
         .vertex.selected-subtract { color: #3259E0; border-color: #3259E0; transform: scale(1.1);}
         .vertex.in-drag-chain { color: #E05929; border-color: #E05929;transform: scale(1.1); }
         
-        #font-selector {
+        .ui-top-left {
             position: absolute;
             top: 10px;
             left: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
+        }
+        #font-selector {
             font-size: 14px;
             padding: 5px;
             border-radius: 5px;
             border: 1px solid #ccc;
-            z-index: 10;
         }
+        #puzzle-input-container {
+            display: flex;
+            gap: 5px;
+        }
+        #puzzle-input {
+            width: 60px;
+            padding: 5px;
+            font-size: 14px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: #333;
+            color: white;
+            text-align: center;
+        }
+        #load-puzzle-button {
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            background-color: #2D9659;
+
+	    border: 3px solid #2D9659;
+        }
+        
         #button-container {
             position: absolute;
             top: 10px;
@@ -100,12 +131,18 @@
 <body>
 
 <div id="game-container">
-    <select id="font-selector">
-        <option value="Sabon, serif">Sabon</option>
-        <option value="'Century Gothic', sans-serif">Century Gothic</option>
-        <option value="Futura, sans-serif">Futura</option>
-        <option value="'Times New Roman', Times, serif">Times New Roman</option>
-    </select>
+    <div class="ui-top-left">
+        <select id="font-selector">
+            <option value="Futura, sans-serif">Futura</option>
+            <option value="'Century Gothic', sans-serif">Century Gothic</option>
+            <option value="Sabon, serif">Sabon</option>
+            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+        </select>
+        <div id="puzzle-input-container">
+            <input type="number" id="puzzle-input" min="0" max="9999" placeholder="1234">
+            <button id="load-puzzle-button">Load</button>
+        </div>
+    </div>
     
     <div id="button-container">
         <button id="reset-button">Reset</button>
@@ -114,7 +151,7 @@
         <button id="undo-button">Undo</button>
     </div>
     
-    <div id="version-display">Ver. 1.2.4</div>
+    <div id="version-display">Ver. 1.2.6</div>
 
     <div id="v0" class="vertex" data-index="0"></div>
     <div id="v1" class="vertex" data-index="1"></div>
@@ -178,6 +215,32 @@
     const sumAllButton = document.getElementById('sum-all-button');
     const messageArea = document.getElementById('message-area');
     const fontSelector = document.getElementById('font-selector');
+    const puzzleInput = document.getElementById('puzzle-input');
+    const loadPuzzleButton = document.getElementById('load-puzzle-button');
+
+    // --- 新しい問題を設定する関数 ---
+    function setProblem(numbers) {
+        historyStack.push(JSON.stringify(currentNumbers));
+        initialNumbers = [...numbers];
+        currentNumbers = [...numbers];
+        historyStack = [];
+        cancelOperation();
+        updateDisplay();
+    }
+
+    // 入力タブから問題を読み込む関数
+    function loadProblemFromInput() {
+        let value = puzzleInput.value;
+        if (value.length > 4) value = value.slice(0, 4);
+        puzzleInput.value = value;
+
+        if (value.length === 4 && !isNaN(value)) {
+            const newNumbers = value.split('').map(digit => parseInt(digit, 10));
+            setProblem(newNumbers);
+        } else if (value.length === 4) {
+            alert("数字4桁で入力してください。");
+        }
+    }
 
     // --- 初期化・更新関数 ---
     function applyLayout() {
@@ -212,9 +275,9 @@
     }
     function setupNewProblem() {
         if (solvablePuzzles.length === 0) { alert("エラー: 問題リストが空です。"); return; }
-        currentPuzzleIndex = Math.floor(Math.random() * solvablePuzzles.length);
-        initialNumbers = [...solvablePuzzles[currentPuzzleIndex]];
-        resetProblem();
+        const randomIndex = Math.floor(Math.random() * solvablePuzzles.length);
+        const newNumbers = solvablePuzzles[randomIndex];
+        setProblem(newNumbers);
     }
     function resetProblem() {
         currentNumbers = [...initialNumbers];
@@ -318,7 +381,7 @@
     vertices.forEach((vertex, index) => {
         vertex.addEventListener('pointerdown', (e) => {
             if (currentNumbers[index] === null) return;
-            if (e.target.closest('#font-selector, #button-container')) return;
+            if (e.target.closest('#font-selector, #button-container, #puzzle-input-container')) return;
             e.target.setPointerCapture(e.pointerId);
             isDragging = true;
             dragChain = [index];
@@ -339,18 +402,10 @@
         }
     }
     document.addEventListener('pointermove', handleMove, { passive: false });
-
-    // ★★★★★ スワイプの閾値を関数の近くに移動 ★★★★★
-    const SWIPE_THRESHOLD_MIN = 10; // これより短い移動は「タップ」
-    const SWIPE_THRESHOLD_MAX = 300; // これより長い移動は「ドラッグ（和）」
-
     function handleEnd(e) {
         if (!isDragging) return;
-        
         const dx = e.clientX - touchStartInfo.x;
         const dy = e.clientY - touchStartInfo.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
         let index = -1;
         const startElement = document.elementFromPoint(touchStartInfo.x, touchStartInfo.y);
         if (startElement && startElement.classList.contains('vertex')) {
@@ -360,8 +415,7 @@
              isDragging = false; dragChain = []; updateDisplay(); return;
         }
 
-        // --- 新しいジェスチャー判定 ---
-        if (dragChain.length > 1) { // 複数要素のドラッグは必ず「和」
+        if (dragChain.length > 1) {
             historyStack.push(JSON.stringify(currentNumbers));
             const sum = dragChain.reduce((acc, idx) => performOperation('+', acc, currentNumbers[idx]), 0);
             const targetIndex = dragChain[dragChain.length - 1];
@@ -371,10 +425,10 @@
             });
             checkWinCondition();
         }
-        else if (distance >= SWIPE_THRESHOLD_MIN && distance <= SWIPE_THRESHOLD_MAX) { // 中距離スワイプは「差」
+        else if (dy > 30 && Math.abs(dx) < dy / 2) {
             selectForOperation('subtract', index);
         }
-        else if (distance < SWIPE_THRESHOLD_MIN) { // 短距離は「タップ」
+        else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
             if (operationState.sourceIndex === null) {
                 selectForOperation('multiply', index);
             } else {
@@ -385,8 +439,6 @@
                 }
             }
         }
-        // 長距離の単一ドラッグは何もしない
-        
         isDragging = false;
         dragChain = [];
         updateDisplay();
@@ -400,6 +452,12 @@
     undoButton.addEventListener('click', undoMove);
     sumAllButton.addEventListener('click', sumAll);
     fontSelector.addEventListener('change', applyFont);
+    loadPuzzleButton.addEventListener('click', loadProblemFromInput);
+    puzzleInput.addEventListener('input', () => {
+        if (puzzleInput.value.length > 4) {
+            puzzleInput.value = puzzleInput.value.slice(0, 4);
+        }
+    });
     gameContainer.addEventListener('contextmenu', e => e.preventDefault());
 
     // --- ゲーム開始処理 ---
